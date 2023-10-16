@@ -1,3 +1,4 @@
+fix delete
 <!DOCTYPE html>
 <html lang="en">
 
@@ -10,7 +11,7 @@
 
 <body>
     <div class="top">
-        <div class="one">📝 TO DO </div>
+        <div class="one">📝 TO DO</div>
         <div>HOME</div>
         <div>CONTACT US</div>
         <div>☰</div>
@@ -22,140 +23,168 @@
         <div id="myEdit"></div>
         <ul id="list"></ul>
         <div class="container">
-            <div><button class="button" id="button" onclick="enter">Enter</button></div>
-            <div><button class="button" id="deletebtn" onclick="del">Delete</button></div>
-            <div><button class="button" id="savebtn">Save</button></div>
-            <div><button class="button" id="clearbtn" onclick="clear">Clear</button></div>
+            <div><button class="button" id="button" onclick="enter()">Enter</button></div>
 
+            <div><button class="button" id="savebtn">Save</button></div>
+            <div><button class="button" id="clearbtn" onclick="clear()">Clear</button></div>
         </div>
     </div>
     <script>
-        window.list = [];
+        let list = [];
         let deletes = 0;
-        display();
+        const url = "http://127.0.0.1:8050";
 
         let input = document.getElementById("myinput");
-        input.addEventListener('keyup', (evt) => {
-            if (evt.key == "Enter") {
-                enter();
+        input.addEventListener('keyup', async(evt) => {
+            if (evt.key === "Enter") {
+                await enter();
             }
         });
-        document.getElementById("button").addEventListener('click', enter);
-        document.getElementById("deletebtn").addEventListener('click', del);
-        document.getElementById("savebtn").addEventListener('click', save);
-        document.getElementById("clearbtn").addEventListener('click', clear);
+        document.getElementById("button").addEventListener('click', enter)
 
-        function enter() {
-            let mytodo = {
-                name: input.value,
-                id: Math.random()
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchTasks();
+        });
+
+        async function fetchTasks() {
+            try {
+                const response = await fetch(url + "/api/read");
+                if (response.ok) {
+                    const tasks = await response.json();
+                    list = tasks;
+                    view();
+                } else {
+                    console.error("Error fetching tasks:", response.status);
+                }
+            } catch (error) {
+                console.error("Error:", error);
             }
-            if (mytodo.name.length != 0) {
-                list.push(mytodo);
-                input.value = '';
-                view();
+        }
+
+        async function enter() {
+            let taskDescription = input.value;
+            if (taskDescription.length !== 0) {
+                try {
+                    const mytodo = {
+                        Task: taskDescription,
+                        Id: Math.floor(Math.random() * 1000)
+                    };
+
+                    const response = await fetch(url + "/api/post", {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(mytodo)
+                    });
+
+                    if (response.ok) {
+                        list.push(mytodo);
+                        input.value = '';
+                        view();
+                    } else {
+                        console.error("Error adding task:", response.status);
+                    }
+                } catch (error) {
+                    console.error("Error:", error);
+                }
             }
         }
 
         function view() {
             let container = document.getElementById('list');
-
-            let tasksToShow = deletes == 1 ? list.filter(todo => !todo.completed) : list;
+            let tasksToShow = deletes === 1 ? list.filter(todo => !todo.completed) : list;
             console.log(tasksToShow);
             let items = tasksToShow.map(todo => {
-                if (complete != true) {
+                if (!todo.completed) {
                     return `
-                        <li id="${todo.id}" ondblclick="onedit('${todo.id}')" >
-                             <span class="${todo.completed ? 'completed' : ''} ">${todo.name}</span>
-                             <input type="checkbox" onchange="toggleComplete('${todo.id}')" ${todo.completed ? 'checked' : ''}>
-                         </li>`
+            <li id="${todo.Id}" ondblclick="onedit(${todo.Id})">
+                <span class="${todo.completed ? 'completed' : ''}">${todo.Task}</span>
+                <input type="checkbox" onchange="toggleComplete(${todo.Id})" ${todo.completed ? 'checked' : ''}>
+            </li>`;
                 }
             });
-            console.log(items);
             container.innerHTML = items.join('');
-            save();
-
         }
 
         function onedit(id) {
-            let index = list.findIndex(item => item.id == id);
-            let todo = list.find(item => item.id == id);
-            let item = document.getElementById(id);
-            let newInput = document.createElement('input');
-            newInput.type = 'text';
-            newInput.value = todo.name;
-            item.innerHTML = '';
-            item.appendChild(newInput);
+            const index = list.findIndex(item => item.Id == id);
+            if (index !== -1) {
+                const todo = list[index];
+                const item = document.getElementById(id);
 
-            newInput.focus();
+                const newInput = document.createElement('input');
+                newInput.type = 'text';
+                newInput.value = todo.Task;
 
-            newInput.setSelectionRange(newInput.value.length, newInput.value.length);
-
-            newInput.addEventListener('keyup', (evt) => {
-                if (evt.key == 'Enter') {
-                    let inp = newInput.value;
-                    let mytodo = {
-                        name: inp,
-                        id: id
-                    };
-                    if (mytodo.name.length != 0) {
-                        list[index] = mytodo;
-                        view();
+                newInput.addEventListener('keyup', async(evt) => {
+                    if (evt.key === 'Enter') {
+                        const updatedTaskDescription = newInput.value;
+                        if (updatedTaskDescription.length !== 0) {
+                            list[index].Task = updatedTaskDescription;
+                            try {
+                                const response = await fetch(url + "/api/update", {
+                                    method: 'PUT',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({
+                                        id: id,
+                                        task: updatedTaskDescription
+                                    })
+                                });
+                                if (!response.ok) {
+                                    console.error("Error updating task:", response.status);
+                                }
+                            } catch (error) {
+                                console.error("Error:", error);
+                            }
+                            view();
+                        }
                     }
-                }
-            });
-        }
+                });
 
-        function complete(id) {
-            let contain = document.getElementById('list');
-            let items = list.map(todo => {
-                return true;
-            });
+                item.innerHTML = '';
+                item.appendChild(newInput);
+
+                newInput.focus();
+                newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+            } else {
+                console.error("Task not found with id: " + id);
+            }
         }
 
         function toggleComplete(id) {
-            let task = list.find(item => item.id == id);
-            task.completed = !task.completed;
-            view();
+            const task = list.find(item => item.Id == id);
+
+            if (task) {
+                task.completed = !task.completed;
+                view();
+            } else {
+                console.error("Task not found with id: " + id);
+            }
         }
 
-        function completeSelected() {
-            list.forEach(task => {
-                if (!task.completed) {
-                    task.completed = true;
+        async function del() {
+            const checkedTasks = list.filter(todo => todo.completed);
+
+            for (const task of checkedTasks) {
+                try {
+                    const response = await fetch(url + "/api/delete?id=" + task.Id, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        list = list.filter(todo => todo.Id !== task.Id);
+                    } else {
+                        console.error("Error deleting task:", response.status);
+                    }
+                } catch (error) {
+                    console.error("Error:", error);
                 }
-            });
-            view(task);
-        }
+            }
 
-        function del() {
-            list = list.filter(todo => !todo.completed);
-            deletes = 1;
             view();
-            deletes = 0;
-        }
-
-
-
-        function save() {
-            console.log(window.list);
-            localStorage.setItem('list', JSON.stringify(window.list));
-            localStorage.setItem('theme', document.documentElement.getAttribute('data-theme'));
-        }
-
-        function display() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-
-            const listData = JSON.parse(localStorage.getItem('list')) || [];
-            window.list = listData;
-            view();
-        }
-
-        function clear() {
-            localStorage.clear();
-            console.log(list)
-
         }
 
         function darkmode() {
